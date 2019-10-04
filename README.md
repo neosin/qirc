@@ -2,7 +2,7 @@
 QIRC is a Python 3 class for PyQt5 that is a full, multi-threaded IRC client.
 
 # Example
-This is a _very_ simple IRC client. It will connect to a server as soon as it starts up, joins a channel, and allows the user to chat with the people in that channel.
+This is a _very_ simple graphical IRC client. It will connect to a server as soon as it starts up, joins a channel, and allows the user to chat with the people in that channel.
 ```python
 import sys
 from qirc import QIRC
