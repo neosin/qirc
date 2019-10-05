@@ -42,29 +42,30 @@ except ImportError:
 
 from PyQt5.QtCore import *
 
-QIRC_VERSION = "0.0132"
+QIRC_VERSION = "0.0140"
 
 class QIRC(QThread):
 
-	ping = pyqtSignal(dict)
-	connected = pyqtSignal(dict)
-	registered = pyqtSignal(dict)
+	server_ping = pyqtSignal(dict)
+	server_connect = pyqtSignal(dict)
+	server_register = pyqtSignal(dict)
 	nick_collision = pyqtSignal(dict)
-	message = pyqtSignal(dict)
-	public = pyqtSignal(dict)
-	private = pyqtSignal(dict)
-	action = pyqtSignal(dict)
+	message_all = pyqtSignal(dict)
+	message_public = pyqtSignal(dict)
+	message_private = pyqtSignal(dict)
+	message_action = pyqtSignal(dict)
 	tick = pyqtSignal(int)
 	user_list = pyqtSignal(dict)
 	user_part = pyqtSignal(dict)
 	user_join = pyqtSignal(dict)
 	user_quit = pyqtSignal(dict)
-	nick_change = pyqtSignal(dict)
-	invite = pyqtSignal(dict)
-	oper = pyqtSignal(dict)
-	error = pyqtSignal(dict)
+	user_nick = pyqtSignal(dict)
+	user_invite = pyqtSignal(dict)
+	user_oper = pyqtSignal(dict)
+	server_error = pyqtSignal(dict)
 	server_motd = pyqtSignal(str)
 	server_hostname = pyqtSignal(str)
+	user_whois = pyqtSignal(dict)
 
 	def __init__(self,**kwargs):
 		super(QIRC, self).__init__(None)
@@ -94,6 +95,7 @@ class QIRC(QThread):
 		self._threadactive = True
 
 		self._users = defaultdict(list)
+		self._whois = {}
 
 		self.motd = []
 		self.hostname = "Unknown"
@@ -135,7 +137,7 @@ class QIRC(QThread):
 		self.floodTimer.beat.connect(self._floodbeat)
 		self.floodTimer.start()
 
-		self.connected.emit( { "client": self, "server": self.server, "port": self.port }  )
+		self.server_connect.emit( { "client": self, "server": self.server, "port": self.port }  )
 
 		# Get the server to send nicks/hostmasks and all status symbols
 		self._send("PROTOCTL UHNAMES NAMESX")
@@ -202,7 +204,7 @@ class QIRC(QThread):
 						"server": self.server,
 						"port": self.port
 					}
-					self.ping.emit(data)
+					self.server_ping.emit(data)
 					break
 
 				# Server welcome
@@ -212,7 +214,7 @@ class QIRC(QThread):
 						"server": self.server,
 						"port": self.port
 					}
-					self.registered.emit(data)
+					self.server_register.emit(data)
 					break
 
 				# Nick collision
@@ -257,7 +259,7 @@ class QIRC(QThread):
 						"message": message
 					}
 
-					self.message.emit(msgdata)
+					self.message_all.emit(msgdata)
 
 					# CTCP action
 					if "\x01ACTION" in message:
@@ -265,17 +267,17 @@ class QIRC(QThread):
 						message = message[:-1]
 						message = message.strip()
 						msgdata["message"] = message
-						self.action.emit(msgdata)
+						self.message_action.emit(msgdata)
 						# Exit so this doesn't trigger another message event
 						break
 
 					# Public/private chat
 					if target.lower()==self.nickname.lower():
 						# private message
-						self.private.emit(msgdata)
+						self.message_private.emit(msgdata)
 					else:
 						# public message
-						self.public.emit(msgdata)
+						self.message_public.emit(msgdata)
 					break
 
 				# User list end
@@ -407,7 +409,7 @@ class QIRC(QThread):
 						"host": host,
 						"new": newnick
 					}
-					self.nick_change.emit(data)
+					self.user_nick.emit(data)
 					break
 
 				# INVITE
@@ -431,7 +433,7 @@ class QIRC(QThread):
 						"host": host,
 						"channel": channel
 					}
-					self.invite.emit(data)
+					self.user_invite.emit(data)
 					break
 
 				# OPER
@@ -441,7 +443,7 @@ class QIRC(QThread):
 						"server": self.server,
 						"port": self.port
 					}
-					self.oper.emit(data)
+					self.user_oper.emit(data)
 					break
 
 				# MOTD begins
@@ -472,6 +474,129 @@ class QIRC(QThread):
 					self.hostname = tokens[3]
 					self.software = tokens[4]
 					self.server_hostname.emit(self.hostname)
+					break
+
+				# ENDOFWHOIS
+				if tokens[1]=="318":
+					tokens.pop(0)	# remove server
+					tokens.pop(0)	# remove message type
+					tokens.pop(0)	# remove nick
+
+					nickname = tokens.pop(0)
+
+					if nickname in self._whois:
+						whois = self._whois[nickname]
+						self.user_whois.emit(self._whois[nickname])
+						del self._whois[nickname]
+					break
+
+				# WHOISUSER
+				if tokens[1]=="311":
+					tokens.pop(0)	# remove server
+					tokens.pop(0)	# remove message type
+					tokens.pop(0)	# remove nick
+
+					nickname = tokens.pop(0)
+					username = tokens.pop(0)
+					host = tokens.pop(0)
+
+					tokens.pop(0)	# remove asterix
+
+					realname = ' '.join(tokens)
+					realname = realname [1:]
+
+					wdata = {
+						"client": self,
+						"nickname": nickname,
+						"username": username,
+						"host": host,
+						"privileges": "None",
+						"server": "Unknown",
+						"idle": 0,
+						"signon": 0,
+						"channels": []
+					}
+					self._whois[nickname] = wdata
+					break
+
+				# WHOISSERVER
+				if tokens[1]=="312":
+					tokens.pop(0)	# remove server
+					tokens.pop(0)	# remove message type
+					tokens.pop(0)	# remove nick
+
+					nickname = tokens.pop(0)
+
+					server = tokens.pop(0)
+					info = ' '.join(tokens)
+					info = info[1:]
+
+					if nickname in self._whois:
+						w = self._whois[nickname]
+						w["server"] = server+"("+info+")"
+						self._whois[nickname] = w
+					break
+
+				# WHOISOPERATOR
+				if tokens[1]=="313":
+					tokens.pop(0)	# remove server
+					tokens.pop(0)	# remove message type
+					tokens.pop(0)	# remove nick
+
+					nickname = tokens.pop(0)
+
+					privs = ' '.join(tokens)
+					privs = privs[1:]
+
+					if nickname in self._whois:
+						w = self._whois[nickname]
+						w["privileges"] = nickname + " " + privs
+						self._whois[nickname] = w
+					break
+
+				# WHOISIDLE
+				if tokens[1]=="317":
+					tokens.pop(0)	# remove server
+					tokens.pop(0)	# remove message type
+					tokens.pop(0)	# remove nick
+
+					nickname = tokens.pop(0)
+
+					idle = tokens.pop(0)
+					signon = tokens.pop(0)
+
+					try:
+						idle = int(idle)
+					except:
+						idle = 0
+
+					try:
+						signon = int(signon)
+					except:
+						signon = 0
+
+					if nickname in eobj._whois:
+						w = self._whois[nickname]
+						w["idle"] = idle
+						w["signon"] = signon
+						self._whois[nickname] = w
+					break
+
+				# WHOISCHANNELS
+				if tokens[1]=="319":
+					tokens.pop(0)	# remove server
+					tokens.pop(0)	# remove message type
+					tokens.pop(0)	# remove nick
+
+					nickname = tokens.pop(0)
+					chans = ' '.join(tokens)
+					chans = chans[1:]
+					channel = chans.split(' ')
+
+					if nickname in eobj._whois:
+						w = self._whois[nickname]
+						w["channels"] = channel
+						self._whois[nickname] = w
 					break
 
 				# Error management
@@ -645,7 +770,7 @@ def emit_double_target_error(eobj,code,tokens):
 		"reason": reason
 	}
 
-	eobj.error.emit(data)
+	eobj.server_error.emit(data)
 
 def emit_target_error(eobj,code,tokens):
 	tokens.pop(0)	# remove server
@@ -663,7 +788,7 @@ def emit_target_error(eobj,code,tokens):
 		"reason": reason
 	}
 
-	eobj.error.emit(data)
+	eobj.server_error.emit(data)
 
 def emit_error(eobj,code,line):
 	parsed = line.split(':')
@@ -679,7 +804,7 @@ def emit_error(eobj,code,line):
 		"reason": reason
 	}
 
-	eobj.error.emit(data)
+	eobj.server_error.emit(data)
 
 def handle_errors(eobj,line):
 
@@ -692,7 +817,7 @@ def handle_errors(eobj,line):
 			"target": [],
 			"reason": "Unknown error"
 		}
-		eobj.error.emit(data)
+		eobj.server_error.emit(data)
 		return True
 
 	if tokens[1]=="401":

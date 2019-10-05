@@ -1,6 +1,6 @@
 <p align="center">
 	<img src="https://github.com/nutjob-laboratories/qirc/raw/master/documentation/images/logo_250.png"><br>
-	<a href="https://github.com/nutjob-laboratories/qirc/blob/master/documentation/QIRC_Class_Documentation.pdf"><b>Documentation for QIRC 0.0132</b></a><br>
+	<a href="https://github.com/nutjob-laboratories/qirc/blob/master/documentation/QIRC_Class_Documentation.pdf"><b>Documentation for QIRC 0.0140</b></a><br>
 </p>
 
 # QIRC
@@ -53,8 +53,8 @@ class SimpleClient(QMainWindow):
 		self.client = QIRC(server=SERVER,port=PORT,nickname=NICKNAME)
 
 		# Set up signals
-		self.client.registered.connect(self.clientRegistered)
-		self.client.public.connect(self.publicMessage)
+		self.client.server_register.connect(self.clientRegistered)
+		self.client.message_public.connect(self.publicMessage)
 		self.client.user_list.connect(self.userList)
 
 		# Connect!

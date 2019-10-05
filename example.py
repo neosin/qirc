@@ -85,14 +85,14 @@ class Interface(QMainWindow):
 
 		self.ircClient = QIRC(server="localhost",port=6667,nickname=NICKNAME)
 
-		self.ircClient.connected.connect(self.gotConnected)
-		self.ircClient.registered.connect(self.gotRegistered)
+		self.ircClient.server_connect.connect(self.gotConnected)
+		self.ircClient.server_register.connect(self.gotRegistered)
 		self.ircClient.nick_collision.connect(self.gotCollision)
-		self.ircClient.public.connect(self.gotPublic)
-		self.ircClient.private.connect(self.gotPrivate)
-		self.ircClient.action.connect(self.gotAction)
+		self.ircClient.message_public.connect(self.gotPublic)
+		self.ircClient.message_private.connect(self.gotPrivate)
+		self.ircClient.message_action.connect(self.gotAction)
 		self.ircClient.user_list.connect(self.gotUserlist)
-		self.ircClient.error.connect(self.gotError)
+		self.ircClient.server_error.connect(self.gotError)
 
 		self.ircClient.start()
 
