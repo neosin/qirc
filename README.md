@@ -1,6 +1,6 @@
 <p align="center">
 	<img src="https://github.com/nutjob-laboratories/qirc/raw/master/documentation/images/logo_250.png"><br>
-	<a href="https://github.com/nutjob-laboratories/qirc/blob/master/documentation/QIRC_Class_Documentation.pdf"><b>Documentation for QIRC 0.0131</b></a><br>
+	<a href="https://github.com/nutjob-laboratories/qirc/blob/master/documentation/QIRC_Class_Documentation.pdf"><b>Documentation for QIRC 0.0132</b></a><br>
 </p>
 
 # QIRC

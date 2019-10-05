@@ -42,7 +42,7 @@ except ImportError:
 
 from PyQt5.QtCore import *
 
-QIRC_VERSION = "0.0131"
+QIRC_VERSION = "0.0132"
 
 class QIRC(QThread):
 
@@ -63,6 +63,8 @@ class QIRC(QThread):
 	invite = pyqtSignal(dict)
 	oper = pyqtSignal(dict)
 	error = pyqtSignal(dict)
+	server_motd = pyqtSignal(str)
+	server_hostname = pyqtSignal(str)
 
 	def __init__(self,**kwargs):
 		super(QIRC, self).__init__(None)
@@ -92,6 +94,10 @@ class QIRC(QThread):
 		self._threadactive = True
 
 		self._users = defaultdict(list)
+
+		self.motd = []
+		self.hostname = "Unknown"
+		self.software = "Unknown"
 
 		self.configure(**kwargs)
 
@@ -436,6 +442,36 @@ class QIRC(QThread):
 						"port": self.port
 					}
 					self.oper.emit(data)
+					break
+
+				# MOTD begins
+				if tokens[1]=="375":
+					self.motd = []
+					break
+
+				# MOTD content
+				if tokens[1]=="372":
+					tokens.pop(0)	# remove server name
+					tokens.pop(0)	# remove message type
+					tokens.pop(0)	# remove nickname
+					data = " ".join(tokens)
+					data = data[3:]
+					data = data.strip()
+					self.motd.append(data)
+					break
+
+				# MOTD ends
+				if tokens[1]=="376":
+					motd = "\n".join(self.motd)
+					motd = motd.strip()
+					self.server_motd.emit(motd)
+					break
+
+				# 004
+				if tokens[1]=="004":
+					self.hostname = tokens[3]
+					self.software = tokens[4]
+					self.server_hostname.emit(self.hostname)
 					break
 
 				# Error management
