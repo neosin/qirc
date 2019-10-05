@@ -50,7 +50,7 @@ class SimpleClient(QMainWindow):
 		# Set up signals
 		self.client.registered.connect(self.clientRegistered)
 		self.client.public.connect(self.publicMessage)
-		self.client.userlist.connect(self.userList)
+		self.client.user_list.connect(self.userList)
 
 		# Connect!
 		self.client.start()

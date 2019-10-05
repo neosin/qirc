@@ -42,7 +42,7 @@ except ImportError:
 
 from PyQt5.QtCore import *
 
-QIRC_VERSION = "0.01"
+QIRC_VERSION = "0.012"
 
 class QIRC(QThread):
 
@@ -55,8 +55,11 @@ class QIRC(QThread):
 	private = pyqtSignal(dict)
 	action = pyqtSignal(dict)
 	tick = pyqtSignal(int)
-
-	userlist = pyqtSignal(dict)
+	user_list = pyqtSignal(dict)
+	user_part = pyqtSignal(dict)
+	user_join = pyqtSignal(dict)
+	user_quit = pyqtSignal(dict)
+	nick_change = pyqtSignal(dict)
 
 	def __init__(self,**kwargs):
 		super(QIRC, self).__init__(None)
@@ -271,7 +274,7 @@ class QIRC(QThread):
 						"users": self._users[channel]
 					}
 
-					self.userlist.emit(data)
+					self.user_list.emit(data)
 					self._users[channel] = []
 					break
 
@@ -291,6 +294,109 @@ class QIRC(QThread):
 						self._users[channel] = users
 
 					break
+
+				# PART
+				if tokens[1].lower()=="part":
+					hasreason = True
+					if len(tokens)==3: hasreason = False
+
+					user = tokens.pop(0)
+					user = user[1:]
+
+					parsed = user.split("!")
+					nickname = parsed[0]
+					host = parsed[1]
+
+					tokens.pop(0)	# remove message type
+
+					channel = tokens.pop(0)
+
+					if hasreason:
+						reason = " ".join(tokens)
+						reason = reason[1:]
+					else:
+						reason = ""
+
+					data = {
+						"client": self,
+						"nickname": nickname,
+						"host": host,
+						"channel": channel,
+						"reason": reason
+					}
+					self.user_part.emit(data)
+					break
+
+				# JOIN
+				if tokens[1].lower()=="join":
+					user = tokens[0]
+					user = user[1:]
+					channel = tokens[2]
+					channel = channel[1:]
+
+					p = user.split("!")
+					nickname = p[0]
+					host = p[1]
+
+					data = {
+						"client": self,
+						"nickname": nickname,
+						"host": host,
+						"channel": channel
+					}
+					self.user_join.emit(data)
+					break
+
+				# QUIT
+				if tokens[1].lower()=="quit":
+					user = tokens.pop(0)
+					user = user[1:]
+
+					parsed = user.split("!")
+					nickname = parsed[0]
+					host = parsed[1]
+
+					tokens.pop(0)	# remove message type
+
+					if len(tokens)>0:
+						reason = " ".join(tokens)
+						reason = reason[1:]
+					else:
+						reason = ""
+
+					data = {
+						"client": self,
+						"nickname": nickname,
+						"host": host,
+						"reason": reason
+					}
+					self.user_quit.emit(data)
+					break
+
+				# NICK
+				if tokens[1].lower()=="nick":
+					user = tokens.pop(0)
+					user = user[1:]
+
+					parsed = user.split("!")
+					nickname = parsed[0]
+					host = parsed[1]
+
+					tokens.pop(0)	# remove msg type
+
+					newnick = tokens.pop(0)
+					newnick = newnick[1:]
+
+					data = {
+						"client": self,
+						"nickname": nickname,
+						"host": host,
+						"new": newnick
+					}
+					self.nick_change.emit(data)
+					break
+
+					
 
 				#print("<- "+line)
 
