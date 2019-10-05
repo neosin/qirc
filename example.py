@@ -91,9 +91,13 @@ class Interface(QMainWindow):
 		self.ircClient.public.connect(self.gotPublic)
 		self.ircClient.private.connect(self.gotPrivate)
 		self.ircClient.action.connect(self.gotAction)
-		self.ircClient.userlist.connect(self.gotUserlist)
+		self.ircClient.user_list.connect(self.gotUserlist)
+		self.ircClient.error.connect(self.gotError)
 
 		self.ircClient.start()
+
+	def gotError(self,errordata):
+		print(errordata)
 
 	def gotUserlist(self,userdata):
 		self.channelUserDisplay.clear()
@@ -123,6 +127,7 @@ class Interface(QMainWindow):
 
 	def gotAction(self,msgdata):
 		self.writeText("<b>"+msgdata["nickname"]+"</b> "+msgdata["message"])
+		self.ircClient.join("#flarp")
 
 	def gotPublic(self,msgdata):
 		self.writeChat(msgdata["nickname"],msgdata["message"])

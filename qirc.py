@@ -42,11 +42,11 @@ except ImportError:
 
 from PyQt5.QtCore import *
 
-QIRC_VERSION = "0.012"
+QIRC_VERSION = "0.0131"
 
 class QIRC(QThread):
 
-	ping = pyqtSignal()
+	ping = pyqtSignal(dict)
 	connected = pyqtSignal(dict)
 	registered = pyqtSignal(dict)
 	nick_collision = pyqtSignal(dict)
@@ -60,6 +60,9 @@ class QIRC(QThread):
 	user_join = pyqtSignal(dict)
 	user_quit = pyqtSignal(dict)
 	nick_change = pyqtSignal(dict)
+	invite = pyqtSignal(dict)
+	oper = pyqtSignal(dict)
+	error = pyqtSignal(dict)
 
 	def __init__(self,**kwargs):
 		super(QIRC, self).__init__(None)
@@ -188,7 +191,12 @@ class QIRC(QThread):
 				# Return server ping
 				if tokens[0].lower()=="ping":
 					self._send("PONG " + tokens[1])
-					self.ping.emit()
+					data = {
+						"client": self,
+						"server": self.server,
+						"port": self.port
+					}
+					self.ping.emit(data)
 					break
 
 				# Server welcome
@@ -396,7 +404,42 @@ class QIRC(QThread):
 					self.nick_change.emit(data)
 					break
 
-					
+				# INVITE
+				if tokens[1].lower()=="invite":
+					user = tokens.pop(0)
+					user = user[1:]
+
+					parsed = user.split("!")
+					nickname = parsed[0]
+					host = parsed[1]
+
+					tokens.pop(0)	# remove message type
+					tokens.pop(0)	# remove nick
+
+					channel = tokens.pop(0)
+					channel = channel[1:]
+
+					data = {
+						"client": self,
+						"nickname": nickname,
+						"host": host,
+						"channel": channel
+					}
+					self.invite.emit(data)
+					break
+
+				# OPER
+				if tokens[1]=="381":
+					data = {
+						"client": self,
+						"server": self.server,
+						"port": self.port
+					}
+					self.oper.emit(data)
+					break
+
+				# Error management
+				if handle_errors(self,line): break
 
 				#print("<- "+line)
 
@@ -548,3 +591,256 @@ class Timer(QThread):
 	def stop(self):
 		self._threadactive = False
 		self.wait()
+
+def emit_double_target_error(eobj,code,tokens):
+	tokens.pop(0)	# remove server
+	tokens.pop(0)	# reove message type
+	tokens.pop(0)	# remove nick
+
+	target = tokens.pop(0)
+	target2 = tokens.pop(0)
+	reason = ' '.join(tokens)
+	reason = reason[1:]
+
+	data = {
+		"client": eobj,
+		"code": int(code),
+		"target": [target,target2],
+		"reason": reason
+	}
+
+	eobj.error.emit(data)
+
+def emit_target_error(eobj,code,tokens):
+	tokens.pop(0)	# remove server
+	tokens.pop(0)	# reove message type
+	tokens.pop(0)	# remove nick
+
+	target = tokens.pop(0)
+	reason = ' '.join(tokens)
+	reason = reason[1:]
+
+	data = {
+		"client": eobj,
+		"code": int(code),
+		"target": [target],
+		"reason": reason
+	}
+
+	eobj.error.emit(data)
+
+def emit_error(eobj,code,line):
+	parsed = line.split(':')
+	if len(parsed)>=2:
+		reason = parsed[1]
+	else:
+		reason = "Unknown error"
+
+	data = {
+		"client": eobj,
+		"code": int(code),
+		"target": [],
+		"reason": reason
+	}
+
+	eobj.error.emit(data)
+
+def handle_errors(eobj,line):
+
+	tokens = line.split()
+
+	if tokens[1]=="400":
+		data = {
+			"client": eobj,
+			"code": 400,
+			"target": [],
+			"reason": "Unknown error"
+		}
+		eobj.error.emit(data)
+		return True
+
+	if tokens[1]=="401":
+		emit_target_error(eobj,"401",tokens)
+		return True
+
+	if tokens[1]=="402":
+		emit_target_error(eobj,"402",tokens)
+		return True
+
+	if tokens[1]=="403":
+		emit_target_error(eobj,"403",tokens)
+		return True
+
+	if tokens[1]=="404":
+		emit_target_error(eobj,"404",tokens)
+		return True
+
+	if tokens[1]=="405":
+		emit_target_error(eobj,"405",tokens)
+		return True
+
+	if tokens[1]=="406":
+		emit_target_error(eobj,"406",tokens)
+		return True
+
+	if tokens[1]=="407":
+		emit_target_error(eobj,"407",tokens)
+		return True
+
+	if tokens[1]=="409":
+		emit_error(eobj,"409",line)
+		return True
+
+	if tokens[1]=="411":
+		emit_error(eobj,"411",line)
+		return True
+
+	if tokens[1]=="412":
+		emit_error(eobj,"412",line)
+		return True
+
+	if tokens[1]=="413":
+		emit_target_error(eobj,"413",tokens)
+		return True
+
+	if tokens[1]=="414":
+		emit_target_error(eobj,"414",tokens)
+		return True
+
+	if tokens[1]=="415":
+		emit_target_error(eobj,"415",tokens)
+		return True
+
+	if tokens[1]=="421":
+		emit_target_error(eobj,"421",tokens)
+		return True
+
+	if tokens[1]=="422":
+		emit_error(eobj,"422",line)
+		return True
+
+	if tokens[1]=="423":
+		emit_target_error(eobj,"423",tokens)
+		return True
+
+	if tokens[1]=="424":
+		emit_error(eobj,"424",line)
+		return True
+
+	if tokens[1]=="431":
+		emit_error(eobj,"431",line)
+		return True
+
+	if tokens[1]=="432":
+		emit_target_error(eobj,"432",tokens)
+		return True
+
+	if tokens[1]=="436":
+		emit_target_error(eobj,"436",tokens)
+		return True
+
+	if tokens[1]=="441":
+		emit_double_target_error(eobj,"441",tokens)
+		return True
+
+	if tokens[1]=="442":
+		emit_target_error(eobj,"442",tokens)
+		return True
+
+	if tokens[1]=="444":
+		emit_target_error(eobj,"444",tokens)
+		return True
+
+	if tokens[1]=="445":
+		emit_error(eobj,"445",line)
+		return True
+
+	if tokens[1]=="446":
+		emit_error(eobj,"446",line)
+		return True
+
+	if tokens[1]=="451":
+		emit_error(eobj,"451",line)
+		return True
+
+	if tokens[1]=="461":
+		emit_target_error(eobj,"461",tokens)
+		return True
+
+	if tokens[1]=="462":
+		emit_error(eobj,"462",line)
+		return True
+
+	if tokens[1]=="463":
+		emit_error(eobj,"463",line)
+		return True
+
+	if tokens[1]=="464":
+		emit_error(eobj,"464",line)
+		return True
+
+	if tokens[1]=="465":
+		emit_error(eobj,"465",line)
+		return True
+
+	if tokens[1]=="467":
+		emit_target_error(eobj,"467",tokens)
+		return True
+
+	if tokens[1]=="471":
+		emit_target_error(eobj,"471",tokens)
+		return True
+
+	if tokens[1]=="472":
+		emit_target_error(eobj,"472",tokens)
+		return True
+
+	if tokens[1]=="473":
+		emit_target_error(eobj,"473",tokens)
+		return True
+
+	if tokens[1]=="474":
+		emit_target_error(eobj,"474",tokens)
+		return True
+
+	if tokens[1]=="475":
+		emit_target_error(eobj,"475",tokens)
+		return True
+
+	if tokens[1]=="476":
+		emit_target_error(eobj,"476",tokens)
+		return True
+
+	if tokens[1]=="478":
+		emit_double_target_error(eobj,"478",tokens)
+		return True
+
+	if tokens[1]=="481":
+		emit_error(eobj,"481",line)
+		return True
+
+	if tokens[1]=="482":
+		emit_target_error(eobj,"482",tokens)
+		return True
+
+	if tokens[1]=="483":
+		emit_error(eobj,"483",line)
+		return True
+
+	if tokens[1]=="485":
+		emit_error(eobj,"481",line)
+		return True
+
+	if tokens[1]=="491":
+		emit_error(eobj,"491",line)
+		return True
+
+	if tokens[1]=="501":
+		emit_error(eobj,"501",line)
+		return True
+
+	if tokens[1]=="502":
+		emit_error(eobj,"502",line)
+		return True
+
+	return False
