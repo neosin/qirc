@@ -36,6 +36,23 @@ class Interface(QMainWindow):
 		user_input = self.userTextInput.text()
 		self.userTextInput.setText('')
 
+		tokens = user_input.split(' ')
+
+		if len(tokens)>=2:
+			if tokens[0].lower()=="/join":
+				if len(tokens)==2:
+					channel = tokens[1]
+					self.ircClient.part(CHANNEL)
+					self.ircClient.join(channel)
+					return
+				elif len(tokens)>2:
+					tokens.pop(0)
+					channel = tokens.pop(0)
+					key = ' '.join(tokens)
+					self.ircClient.part(CHANNEL)
+					self.ircClient.join(channel,key)
+					return
+
 		self.ircClient.privmsg(CHANNEL,user_input)
 		self.writeChat(NICKNAME,user_input)
 
@@ -94,7 +111,21 @@ class Interface(QMainWindow):
 		self.ircClient.user_list.connect(self.gotUserlist)
 		self.ircClient.server_error.connect(self.gotError)
 
+		self.ircClient.tick.connect(self.tick)
+
+		self.ircClient.user_join.connect(self.gotJoin)
+
 		self.ircClient.start()
+
+	def gotJoin(self,joindata):
+		if joindata["nickname"].lower()==NICKNAME.lower():
+			global CHANNEL
+			CHANNEL = joindata["channel"]
+			self.writeText("Joined "+CHANNEL)
+
+	def tick(self,uptime):
+		self.channelChatDisplay.update()
+		self.channelUserDisplay.update()
 
 	def gotError(self,errordata):
 		print(errordata)
@@ -123,6 +154,8 @@ class Interface(QMainWindow):
 			ui = QListWidgetItem()
 			ui.setText(user)
 			self.channelUserDisplay.addItem(ui)
+
+		self.channelUserDisplay.repaint()
 
 
 	def gotAction(self,msgdata):
